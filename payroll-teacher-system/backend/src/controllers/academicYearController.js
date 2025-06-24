@@ -17,7 +17,12 @@ const getAllAcademicYears = async (req, res) => {
 
     // Build filter
     const filter = {};
-    if (isActive !== undefined) filter.isActive = isActive === 'true';
+    // Handle isActive filter - default to true if not specified
+    if (isActive !== undefined) {
+      filter.isActive = isActive === 'true' || isActive === true;
+    } else {
+      filter.isActive = true; // Default to active academic years only
+    }
 
     let query;
     
@@ -77,7 +82,7 @@ const getAllAcademicYears = async (req, res) => {
       data: academicYears
     });
   } catch (error) {
-    console.error('Get academic years error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy danh sách năm học',
@@ -110,7 +115,7 @@ const getCurrentAcademicYear = async (req, res) => {
       data: currentAcademicYear
     });
   } catch (error) {
-    console.error('Get current academic year error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy thông tin năm học hiện tại',
@@ -143,7 +148,7 @@ const getAcademicYearById = async (req, res) => {
       data: academicYear
     });
   } catch (error) {
-    console.error('Get academic year error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy thông tin năm học',
@@ -176,7 +181,7 @@ const getAcademicYearByCode = async (req, res) => {
       data: academicYear
     });
   } catch (error) {
-    console.error('Get academic year by code error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy thông tin năm học',
@@ -223,7 +228,7 @@ const createAcademicYear = async (req, res) => {
       data: academicYear
     });
   } catch (error) {
-    console.error('Create academic year error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi tạo năm học mới',
@@ -267,7 +272,7 @@ const updateAcademicYear = async (req, res) => {
       data: updatedAcademicYear
     });
   } catch (error) {
-    console.error('Update academic year error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi cập nhật năm học',
@@ -297,7 +302,7 @@ const toggleAcademicYearStatus = async (req, res) => {
       data: updatedAcademicYear
     });
   } catch (error) {
-    console.error('Toggle academic year status error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi thay đổi trạng thái năm học',
@@ -335,7 +340,7 @@ const deleteAcademicYear = async (req, res) => {
       message: 'Đã xóa năm học thành công'
     });
   } catch (error) {
-    console.error('Delete academic year error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi xóa năm học',
@@ -420,7 +425,7 @@ const getAcademicYearStatistics = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get academic year statistics error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy thống kê năm học',

@@ -27,11 +27,11 @@ const validateAssignmentCreation = [
     .isMongoId()
     .withMessage('ID lớp học phần không hợp lệ'),
   
-  body('semesterId')
+  body('academicYearId')
     .notEmpty()
-    .withMessage('ID học kì là bắt buộc')
+    .withMessage('ID năm học là bắt buộc')
     .isMongoId()
-    .withMessage('ID học kì không hợp lệ'),
+    .withMessage('ID năm học không hợp lệ'),
   
   body('assignmentType')
     .optional()
@@ -173,10 +173,10 @@ const validateAssignmentUpdate = [
     .isMongoId()
     .withMessage('ID lớp học phần không hợp lệ'),
   
-  body('semesterId')
+  body('academicYearId')
     .optional()
     .isMongoId()
-    .withMessage('ID học kì không hợp lệ'),
+    .withMessage('ID năm học không hợp lệ'),
   
   body('assignmentType')
     .optional()
@@ -238,10 +238,10 @@ const validateTeacherId = [
     .withMessage('ID giảng viên không hợp lệ')
 ];
 
-const validateSemesterId = [
-  param('semesterId')
+const validateAcademicYearId = [
+  param('academicYearId')
     .isMongoId()
-    .withMessage('ID học kì không hợp lệ')
+    .withMessage('ID năm học không hợp lệ')
 ];
 
 const validateClassId = [
@@ -251,10 +251,10 @@ const validateClassId = [
 ];
 
 const validateQueryFilters = [
-  query('semesterId')
+  query('academicYearId')
     .optional()
     .isMongoId()
-    .withMessage('ID học kì không hợp lệ'),
+    .withMessage('ID năm học không hợp lệ'),
   
   query('teacherId')
     .optional()
@@ -340,11 +340,11 @@ const validateBulkAssignment = [
     .isMongoId()
     .withMessage('ID lớp học phần không hợp lệ'),
   
-  body('assignments.*.semesterId')
+  body('assignments.*.academicYearId')
     .notEmpty()
-    .withMessage('ID học kì là bắt buộc')
+    .withMessage('ID năm học là bắt buộc')
     .isMongoId()
-    .withMessage('ID học kì không hợp lệ'),
+    .withMessage('ID năm học không hợp lệ'),
   
   body('assignments.*.teachingHours')
     .notEmpty()
@@ -382,7 +382,7 @@ router.post('/:id/cancel', validateMongoId, validateCancellation, deleteTeaching
 
 // Query operations by different entities
 router.get('/teacher/:teacherId', validateTeacherId, getAssignmentsByTeacher);
-router.get('/semester/:semesterId', validateSemesterId, getTeachingAssignments);
+router.get('/academicYear/:academicYearId', validateAcademicYearId, getTeachingAssignments);
 router.get('/class/:classId', validateClassId, getAssignmentsByClass);
 
 // Statistics and reporting - inspired by Payroll Engine's analytics

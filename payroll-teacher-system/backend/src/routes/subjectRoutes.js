@@ -7,10 +7,7 @@ const {
   createSubject,
   updateSubject,
   deleteSubject,
-  toggleSubjectStatus,
   getSubjectsByDepartment,
-  getSubjectsByType,
-  getSubjectsByLevel,
   getSubjectStatistics
 } = require('../controllers/subjectController');
 
@@ -43,14 +40,16 @@ const validateSubjectCreation = [
     }),
   
   body('coefficient')
-    .optional()
     .isFloat({ min: 0.5, max: 3.0 })
     .withMessage('Hệ số học phần phải từ 0.5-3.0'),
   
-  body('periods')
-    .optional()
-    .isInt({ min: 15, max: 150 })
-    .withMessage('Số tiết phải từ 15-150'),
+  body('soTietLyThuyet')
+    .isInt({ min: 0, max: 150 })
+    .withMessage('Số tiết lý thuyết phải từ 0-150'),
+  
+  body('soTietThucHanh')
+    .isInt({ min: 0, max: 150 })
+    .withMessage('Số tiết thực hành phải từ 0-150'),
   
   body('departmentId')
     .notEmpty()
@@ -71,17 +70,7 @@ const validateSubjectCreation = [
   body('prerequisites.*')
     .optional()
     .isMongoId()
-    .withMessage('Học phần tiên quyết không hợp lệ'),
-  
-  body('subjectType')
-    .optional()
-    .isIn(['general', 'major', 'specialization', 'elective', 'internship'])
-    .withMessage('Loại học phần không hợp lệ'),
-  
-  body('level')
-    .optional()
-    .isIn(['undergraduate', 'graduate', 'postgraduate'])
-    .withMessage('Cấp độ học phần không hợp lệ')
+    .withMessage('Học phần tiên quyết không hợp lệ')
 ];
 
 const validateSubjectUpdate = [
@@ -113,10 +102,15 @@ const validateSubjectUpdate = [
     .isFloat({ min: 0.5, max: 3.0 })
     .withMessage('Hệ số học phần phải từ 0.5-3.0'),
   
-  body('periods')
+  body('soTietLyThuyet')
     .optional()
-    .isInt({ min: 15, max: 150 })
-    .withMessage('Số tiết phải từ 15-150'),
+    .isInt({ min: 0, max: 150 })
+    .withMessage('Số tiết lý thuyết phải từ 0-150'),
+  
+  body('soTietThucHanh')
+    .optional()
+    .isInt({ min: 0, max: 150 })
+    .withMessage('Số tiết thực hành phải từ 0-150'),
   
   body('departmentId')
     .optional()
@@ -136,17 +130,7 @@ const validateSubjectUpdate = [
   body('prerequisites.*')
     .optional()
     .isMongoId()
-    .withMessage('Học phần tiên quyết không hợp lệ'),
-  
-  body('subjectType')
-    .optional()
-    .isIn(['general', 'major', 'specialization', 'elective', 'internship'])
-    .withMessage('Loại học phần không hợp lệ'),
-  
-  body('level')
-    .optional()
-    .isIn(['undergraduate', 'graduate', 'postgraduate'])
-    .withMessage('Cấp độ học phần không hợp lệ')
+    .withMessage('Học phần tiên quyết không hợp lệ')
 ];
 
 const validateMongoId = [
@@ -169,18 +153,6 @@ const validateDepartmentId = [
     .withMessage('ID khoa không hợp lệ')
 ];
 
-const validateSubjectType = [
-  param('type')
-    .isIn(['general', 'major', 'specialization', 'elective', 'internship'])
-    .withMessage('Loại học phần không hợp lệ')
-];
-
-const validateSubjectLevel = [
-  param('level')
-    .isIn(['undergraduate', 'graduate', 'postgraduate'])
-    .withMessage('Cấp độ học phần không hợp lệ')
-];
-
 // Routes
 
 // @route   GET /api/subjects/statistics
@@ -197,16 +169,6 @@ router.get('/code/:code', validateSubjectCode, getSubjectByCode);
 // @desc    Get subjects by department
 // @access  Public
 router.get('/department/:departmentId', validateDepartmentId, getSubjectsByDepartment);
-
-// @route   GET /api/subjects/type/:type
-// @desc    Get subjects by type
-// @access  Public
-router.get('/type/:type', validateSubjectType, getSubjectsByType);
-
-// @route   GET /api/subjects/level/:level
-// @desc    Get subjects by level
-// @access  Public
-router.get('/level/:level', validateSubjectLevel, getSubjectsByLevel);
 
 // @route   GET /api/subjects/:id
 // @desc    Get single subject
@@ -227,11 +189,6 @@ router.post('/', validateSubjectCreation, createSubject);
 // @desc    Update subject
 // @access  Private
 router.put('/:id', validateMongoId, validateSubjectUpdate, updateSubject);
-
-// @route   PATCH /api/subjects/:id/toggle-status
-// @desc    Toggle subject status
-// @access  Private
-router.patch('/:id/toggle-status', validateMongoId, toggleSubjectStatus);
 
 // @route   DELETE /api/subjects/:id
 // @desc    Delete subject

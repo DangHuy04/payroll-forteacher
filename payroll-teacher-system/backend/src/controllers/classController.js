@@ -1,6 +1,5 @@
 const Class = require('../models/Class');
 const Subject = require('../models/Subject');
-const Teacher = require('../models/Teacher');
 const TeachingAssignment = require('../models/TeachingAssignment');
 const { validationResult } = require('express-validator');
 
@@ -10,12 +9,10 @@ const { validationResult } = require('express-validator');
 const getClasses = async (req, res) => {
   try {
     const {
-      semesterId,
       subjectId,
       teacherId,
-      status,
       classType,
-      isActive = true,
+      isActive,
       includeStats = false,
       page = 1,
       limit = 50,
@@ -24,11 +21,9 @@ const getClasses = async (req, res) => {
 
     // Build filter
     const filter = {};
-    if (isActive !== undefined) filter.isActive = isActive === 'true';
-    if (semesterId) filter.semesterId = semesterId;
+    if (isActive !== undefined && isActive !== '') filter.isActive = isActive === 'true';
     if (subjectId) filter.subjectId = subjectId;
     if (teacherId) filter.teacherId = teacherId;
-    if (status) filter.status = status;
     if (classType) filter.classType = classType;
 
     let query;
@@ -44,14 +39,7 @@ const getClasses = async (req, res) => {
             as: 'subject'
           }
         },
-        {
-          $lookup: {
-            from: 'teachers',
-            localField: 'teacherId',
-            foreignField: '_id',
-            as: 'teacher'
-          }
-        },
+
         {
           $lookup: {
             from: 'teachingassignments',
@@ -63,7 +51,6 @@ const getClasses = async (req, res) => {
         {
           $addFields: {
             subject: { $arrayElemAt: ['$subject', 0] },
-            teacher: { $arrayElemAt: ['$teacher', 0] },
             assignmentCount: { $size: '$assignments' }
           }
         }
@@ -79,9 +66,7 @@ const getClasses = async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
     
     query = Class.find(filter)
-      .populate('semester', 'code name')
-      .populate('subject', 'code name credits coefficient')
-      .populate('teacher', 'code fullName')
+      .populate('subjectId', 'code name credits coefficient soTietLyThuyet soTietThucHanh')
       .sort(sort)
       .skip(skip)
       .limit(parseInt(limit));
@@ -101,10 +86,10 @@ const getClasses = async (req, res) => {
       data: classes
     });
   } catch (error) {
-    console.error('Get classes error:', error);
+    
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi lấy danh sách lớp học',
+      message: 'Lỗi khi lấy danh sách lớp học phần',
       error: error.message
     });
   }
@@ -116,9 +101,7 @@ const getClasses = async (req, res) => {
 const getClass = async (req, res) => {
   try {
     const classItem = await Class.findById(req.params.id)
-      .populate('semester', 'code name startDate endDate')
-      .populate('subject', 'code name credits coefficient periods departmentId')
-      .populate('teacher', 'code fullName email phone')
+      .populate('subjectId', 'code name credits coefficient soTietLyThuyet soTietThucHanh departmentId')
       .populate({
         path: 'assignments',
         select: 'teacherId assignmentType hoursAssigned status',
@@ -131,7 +114,7 @@ const getClass = async (req, res) => {
     if (!classItem) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy lớp học'
+        message: 'Không tìm thấy lớp học phần'
       });
     }
 
@@ -140,26 +123,25 @@ const getClass = async (req, res) => {
       data: classItem
     });
   } catch (error) {
-    console.error('Get class error:', error);
+    
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi lấy thông tin lớp học',
+      message: 'Lỗi khi lấy thông tin lớp học phần',
       error: error.message
     });
   }
 };
 
-// @desc    Get classes by semester
-// @route   GET /api/classes/semester/:semesterId
+// @desc    Get classes by academic year
+// @route   GET /api/classes/academic-year/:academicYearId
 // @access  Public
-const getClassesBySemester = async (req, res) => {
+const getClassesByAcademicYear = async (req, res) => {
   try {
     const classes = await Class.find({
-      semesterId: req.params.semesterId,
+      academicYearId: req.params.academicYearId,
       isActive: true
     })
-      .populate('subject', 'code name credits')
-      .populate('teacher', 'code fullName')
+      .populate('subjectId', 'code name credits soTietLyThuyet soTietThucHanh coefficient')
       .sort('code');
 
     res.json({
@@ -168,10 +150,10 @@ const getClassesBySemester = async (req, res) => {
       data: classes
     });
   } catch (error) {
-    console.error('Get classes by semester error:', error);
+    
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi lấy danh sách lớp học theo học kỳ',
+      message: 'Lỗi khi lấy danh sách lớp học theo năm học',
       error: error.message
     });
   }
@@ -193,72 +175,63 @@ const createClass = async (req, res) => {
     const {
       code,
       name,
-      semesterId,
       subjectId,
-      teacherId,
       studentCount,
       maxStudents,
+      schedule,
       classType,
-      schedule
+      teachingMethod,
+      description,
+      notes
     } = req.body;
 
-    // Check if class code already exists in the semester
-    const existingClass = await Class.findOne({
-      code,
-      semesterId
-    });
-
-    if (existingClass) {
-      return res.status(400).json({
-        success: false,
-        message: 'Mã lớp học đã tồn tại trong học kỳ này'
-      });
-    }
-
-    // Check schedule conflicts
-    if (schedule && schedule.length > 0) {
-      const hasConflict = await checkScheduleConflicts(schedule, semesterId, teacherId);
-      if (hasConflict) {
-        return res.status(400).json({
-          success: false,
-          message: 'Lịch học bị trùng với lớp khác'
-        });
+    // Auto-generate code if not provided
+    let finalCode = code;
+    if (!finalCode) {
+      const subject = await Subject.findById(subjectId);
+      if (subject) {
+        const existingClasses = await Class.find({ subjectId });
+        const classNumber = existingClasses.length + 1;
+        finalCode = `${subject.code}.${classNumber.toString().padStart(2, '0')}`;
       }
     }
 
-    // Create new class
-    const classItem = await Class.create({
-      code,
+    const classData = {
+      code: finalCode,
       name,
-      semesterId,
       subjectId,
-      teacherId,
       studentCount,
       maxStudents,
-      classType,
       schedule,
-      status: 'planning',
-      isActive: true
-    });
+      classType,
+      teachingMethod,
+      description,
+      notes
+    };
 
-    // Create main teaching assignment
-    await TeachingAssignment.create({
-      classId: classItem._id,
-      teacherId,
-      semesterId,
-      assignmentType: 'main',
-      status: 'assigned'
-    });
+    const newClass = await Class.create(classData);
+    
+    // Populate the created class
+    await newClass.populate('subjectId', 'code name credits coefficient soTietLyThuyet soTietThucHanh');
 
     res.status(201).json({
       success: true,
-      data: classItem
+      message: 'Tạo lớp học phần thành công',
+      data: newClass
     });
   } catch (error) {
-    console.error('Create class error:', error);
+    
+    
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: 'Mã lớp học phần đã tồn tại'
+      });
+    }
+    
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi tạo lớp học mới',
+      message: 'Lỗi khi tạo lớp học phần',
       error: error.message
     });
   }
@@ -348,7 +321,7 @@ const updateClass = async (req, res) => {
       data: updatedClass
     });
   } catch (error) {
-    console.error('Update class error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi cập nhật lớp học',
@@ -388,7 +361,7 @@ const deleteClass = async (req, res) => {
       message: 'Đã xóa lớp học thành công'
     });
   } catch (error) {
-    console.error('Delete class error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi xóa lớp học',
@@ -402,104 +375,32 @@ const deleteClass = async (req, res) => {
 // @access  Public
 const getClassStatistics = async (req, res) => {
   try {
-    const stats = await Class.aggregate([
-      {
-        $lookup: {
-          from: 'subjects',
-          localField: 'subjectId',
-          foreignField: '_id',
-          as: 'subject'
-        }
-      },
-      {
-        $lookup: {
-          from: 'teachingassignments',
-          localField: '_id',
-          foreignField: 'classId',
-          as: 'assignments'
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          totalClasses: { $sum: 1 },
-          activeClasses: {
-            $sum: { $cond: [{ $eq: ['$isActive', true] }, 1, 0] }
-          },
-          totalStudents: { $sum: '$studentCount' },
-          averageStudentsPerClass: { $avg: '$studentCount' },
-          totalAssignments: { $sum: { $size: '$assignments' } },
-          classesByType: {
-            $push: {
-              type: '$classType',
-              count: 1
-            }
-          },
-          classesByStatus: {
-            $push: {
-              status: '$status',
-              count: 1
-            }
-          }
-        }
-      },
-      {
-        $project: {
-          _id: 0,
-          totalClasses: 1,
-          activeClasses: 1,
-          totalStudents: 1,
-          averageStudentsPerClass: 1,
-          totalAssignments: 1,
-          classesByType: {
-            $reduce: {
-              input: '$classesByType',
-              initialValue: {},
-              in: {
-                $mergeObjects: [
-                  '$$value',
-                  { $literal: { ['$$this.type']: { $sum: '$$this.count' } } }
-                ]
-              }
-            }
-          },
-          classesByStatus: {
-            $reduce: {
-              input: '$classesByStatus',
-              initialValue: {},
-              in: {
-                $mergeObjects: [
-                  '$$value',
-                  { $literal: { ['$$this.status']: { $sum: '$$this.count' } } }
-                ]
-              }
-            }
-          }
-        }
-      }
-    ]);
+    const { academicYearId } = req.query;
+    
+    // Build filter
+    const filter = { isActive: true };
+    if (academicYearId) {
+      filter.academicYearId = academicYearId;
+    }
 
-    const typeStats = await Class.aggregate([
-      { $match: { isActive: true } },
-      {
-        $group: {
-          _id: '$classType',
-          count: { $sum: 1 },
-          totalStudents: { $sum: '$studentCount' },
-          averageStudents: { $avg: '$studentCount' }
+    // Get all classes with populated subject data
+    const classes = await Class.find(filter)
+      .populate({
+        path: 'subjectId',
+        select: 'code name credits departmentId',
+        populate: {
+          path: 'departmentId',
+          select: 'name code'
         }
-      }
-    ]);
+      })
+      .sort('code');
 
     res.json({
       success: true,
-      data: {
-        summary: stats[0] || {},
-        typeStats
-      }
+      data: classes
     });
   } catch (error) {
-    console.error('Get class statistics error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy thống kê lớp học',
@@ -509,9 +410,9 @@ const getClassStatistics = async (req, res) => {
 };
 
 // Helper function to check schedule conflicts
-const checkScheduleConflicts = async (newSchedule, semesterId, teacherId, excludeClassId = null) => {
+const checkScheduleConflicts = async (newSchedule, academicYearId, teacherId, excludeClassId = null) => {
   const filter = {
-    semesterId,
+    academicYearId,
     teacherId,
     isActive: true
   };
@@ -546,12 +447,14 @@ const checkScheduleConflicts = async (newSchedule, semesterId, teacherId, exclud
   return false; // No conflicts
 };
 
+
+
 module.exports = {
   getClasses,
   getClass,
   createClass,
   updateClass,
   deleteClass,
-  getClassesBySemester,
+  getClassesByAcademicYear,
   getClassStatistics
 }; 

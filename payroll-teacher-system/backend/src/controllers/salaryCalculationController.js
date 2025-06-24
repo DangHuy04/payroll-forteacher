@@ -357,7 +357,7 @@ const calculateSalary = async (req, res) => {
       totalHours: assignments.reduce((sum, a) => sum + a.hoursAssigned, 0)
     });
   } catch (err) {
-    console.error(err.message);
+    
     res.status(500).send('Lỗi server');
   }
 };
@@ -822,7 +822,7 @@ const calculateDepartmentSalaries = async (req, res) => {
       salariesByTeacher
     });
   } catch (err) {
-    console.error(err.message);
+    
     res.status(500).send('Lỗi server');
   }
 };
@@ -884,7 +884,7 @@ const getSalaryStatistics = async (req, res) => {
       averageSalaryPerHour: totalSalary / assignmentStats.totalHours
     });
   } catch (err) {
-    console.error(err.message);
+    
     res.status(500).send('Lỗi server');
   }
 };

@@ -129,7 +129,7 @@ const getAllDepartments = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get departments error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy danh sách khoa',
@@ -160,7 +160,7 @@ const getDepartmentById = async (req, res) => {
       data: department
     });
   } catch (error) {
-    console.error('Get department by ID error:', error);
+    
     if (error.name === 'CastError') {
       return res.status(400).json({
         success: false,
@@ -194,7 +194,7 @@ const getDepartmentByCode = async (req, res) => {
       data: department
     });
   } catch (error) {
-    console.error('Get department by code error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy thông tin khoa',
@@ -284,7 +284,7 @@ const createDepartment = async (req, res) => {
       data: department
     });
   } catch (error) {
-    console.error('Create department error:', error);
+    
     
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map(err => err.message);
@@ -404,7 +404,7 @@ const updateDepartment = async (req, res) => {
       data: department
     });
   } catch (error) {
-    console.error('Update department error:', error);
+    
 
     if (error.name === 'CastError') {
       return res.status(400).json({
@@ -460,7 +460,7 @@ const toggleDepartmentStatus = async (req, res) => {
       data: department
     });
   } catch (error) {
-    console.error('Toggle department status error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi thay đổi trạng thái khoa',
@@ -490,7 +490,7 @@ const deleteDepartment = async (req, res) => {
       message: 'Xóa khoa thành công'
     });
   } catch (error) {
-    console.error('Delete department error:', error);
+    
 
     if (error.name === 'CastError') {
       return res.status(400).json({
@@ -632,7 +632,7 @@ const getDepartmentStatistics = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get department statistics error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy thống kê khoa',
@@ -698,7 +698,7 @@ const getTeachersByDepartment = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get teachers by department error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy danh sách giáo viên theo khoa',

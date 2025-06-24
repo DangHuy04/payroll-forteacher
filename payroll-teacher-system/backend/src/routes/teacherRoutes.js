@@ -3,12 +3,21 @@ const { body, param, query } = require('express-validator');
 const {
   getAllTeachers,
   getTeacherById,
-  createTeacher
+  createTeacher,
+  updateTeacher,
+  deleteTeacher,
+  getTeacherStatistics
 } = require('../controllers/teacherController');
 
 const router = express.Router();
 
 // Validation middleware
+const idValidation = [
+  param('id')
+    .isMongoId()
+    .withMessage('ID không hợp lệ')
+];
+
 const createTeacherValidation = [
   body('code')
     .notEmpty()
@@ -52,7 +61,7 @@ const createTeacherValidation = [
     .isISO8601()
     .withMessage('Ngày vào làm không hợp lệ')
     .toDate(),
-  body('citizenId')
+  body('identityNumber')
     .optional()
     .isLength({ min: 9, max: 12 })
     .withMessage('CCCD/CMND phải có độ dài từ 9-12 ký tự')
@@ -64,16 +73,13 @@ const createTeacherValidation = [
     .withMessage('Địa chỉ không được quá 500 ký tự')
 ];
 
-const idValidation = [
-  param('id')
-    .isMongoId()
-    .withMessage('ID không hợp lệ')
-];
-
 // Routes
 router.get('/', getAllTeachers);
+router.get('/statistics', getTeacherStatistics);
 router.get('/:id', idValidation, getTeacherById);
 
 router.post('/', createTeacherValidation, createTeacher);
+router.put('/:id', idValidation, updateTeacher);
+router.delete('/:id', idValidation, deleteTeacher);
 
 module.exports = router; 

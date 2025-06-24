@@ -16,11 +16,6 @@ const classSchema = new mongoose.Schema({
     trim: true,
     maxlength: [200, 'Tên lớp học phần không được quá 200 ký tự']
   },
-  semesterId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Semester',
-    required: [true, 'Học kì là bắt buộc']
-  },
   subjectId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Subject',
@@ -43,6 +38,12 @@ const classSchema = new mongoose.Schema({
     default: 50,
     min: [5, 'Số sinh viên tối đa phải từ 5'],
     max: [200, 'Số sinh viên tối đa không được quá 200']
+  },
+  classCoefficient: {
+    type: Number,
+    default: 1.0,
+    min: [1.0, 'Hệ số lớp phải từ 1.0'],
+    max: [1.4, 'Hệ số lớp không được quá 1.4']
   },
   schedule: {
     dayOfWeek: {
@@ -67,14 +68,6 @@ const classSchema = new mongoose.Schema({
       type: String,
       maxlength: [50, 'Tên phòng học không được quá 50 ký tự']
     }
-  },
-  status: {
-    type: String,
-    enum: {
-      values: ['planning', 'open', 'full', 'in_progress', 'completed', 'cancelled'],
-      message: 'Trạng thái lớp học không hợp lệ'
-    },
-    default: 'planning'
   },
   classType: {
     type: String,
@@ -125,19 +118,10 @@ const classSchema = new mongoose.Schema({
 });
 
 // Compound index for uniqueness within semester
-classSchema.index({ semesterId: 1, subjectId: 1, code: 1 }, { unique: true });
+classSchema.index({ subjectId: 1, code: 1 }, { unique: true });
 classSchema.index({ code: 1 });
-classSchema.index({ semesterId: 1, status: 1 });
 classSchema.index({ subjectId: 1, isActive: 1 });
 classSchema.index({ 'schedule.dayOfWeek': 1, 'schedule.startPeriod': 1 });
-
-// Virtual for semester info
-classSchema.virtual('semester', {
-  ref: 'Semester',
-  localField: 'semesterId',
-  foreignField: '_id',
-  justOne: true
-});
 
 // Virtual for subject info
 classSchema.virtual('subject', {
@@ -186,25 +170,12 @@ classSchema.virtual('fullDisplayName').get(function() {
   return `${this.code} - ${this.name}`;
 });
 
-// Virtual for status display
-classSchema.virtual('statusDisplay').get(function() {
-  const statuses = {
-    'planning': 'Đang lập kế hoạch',
-    'open': 'Mở đăng ký',
-    'full': 'Đã đầy',
-    'in_progress': 'Đang diễn ra',
-    'completed': 'Hoàn thành',
-    'cancelled': 'Đã hủy'
-  };
-  return statuses[this.status] || this.status;
-});
-
 // Virtual for class type display
 classSchema.virtual('classTypeDisplay').get(function() {
   const types = {
     'theory': 'Lý thuyết',
     'practice': 'Thực hành',
-    'lab': 'Thí nghiệm',
+    'lab': 'Phòng thí nghiệm',
     'seminar': 'Seminar',
     'online': 'Trực tuyến'
   };
@@ -214,52 +185,11 @@ classSchema.virtual('classTypeDisplay').get(function() {
 // Virtual for teaching method display
 classSchema.virtual('teachingMethodDisplay').get(function() {
   const methods = {
-    'offline': 'Tại lớp',
+    'offline': 'Trực tiếp',
     'online': 'Trực tuyến',
     'hybrid': 'Kết hợp'
   };
   return methods[this.teachingMethod] || this.teachingMethod;
-});
-
-// Virtual for day of week display
-classSchema.virtual('dayOfWeekDisplay').get(function() {
-  if (!this.schedule.dayOfWeek) return '';
-  const days = {
-    2: 'Thứ 2',
-    3: 'Thứ 3',
-    4: 'Thứ 4',
-    5: 'Thứ 5',
-    6: 'Thứ 6',
-    7: 'Chủ nhật'
-  };
-  return days[this.schedule.dayOfWeek] || '';
-});
-
-// Virtual for schedule display
-classSchema.virtual('scheduleDisplay').get(function() {
-  if (!this.schedule.dayOfWeek || !this.schedule.startPeriod) return 'Chưa xếp lịch';
-  
-  const dayName = this.dayOfWeekDisplay;
-  const endPeriod = this.schedule.startPeriod + (this.schedule.periodsCount || 2) - 1;
-  const room = this.schedule.room ? ` - ${this.schedule.room}` : '';
-  
-  return `${dayName}, tiết ${this.schedule.startPeriod}-${endPeriod}${room}`;
-});
-
-// Virtual for total teaching periods (from subject)
-classSchema.virtual('totalTeachingPeriods').get(function() {
-  if (this.subject) {
-    return this.subject.periods;
-  }
-  return 0;
-});
-
-// Virtual for semester total salary (will be calculated when TeachingAssignment is implemented)
-classSchema.virtual('estimatedSalary').get(function() {
-  if (this.subject) {
-    return this.subject.salaryCoefficient * this.studentCount;
-  }
-  return 0;
 });
 
 // Methods
@@ -269,211 +199,61 @@ classSchema.methods.toJSON = function() {
   return obj;
 };
 
-classSchema.methods.canEdit = function() {
-  return this.status === 'planning' || this.status === 'open';
-};
-
 classSchema.methods.canDelete = function() {
-  return this.status === 'planning' || this.status === 'cancelled';
-};
-
-classSchema.methods.canAddStudents = function() {
-  return this.status === 'open' && this.studentCount < this.maxStudents;
-};
-
-classSchema.methods.updateStatus = function() {
-  if (this.studentCount >= this.maxStudents) {
-    this.status = 'full';
-  } else if (this.status === 'full' && this.studentCount < this.maxStudents) {
-    this.status = 'open';
-  }
+  return this.metadata.teacherAssignments === 0;
 };
 
 // Static methods
-classSchema.statics.getActive = function() {
-  return this.find({ isActive: true })
-    .populate('semester', 'code name')
-    .populate('subject', 'code name credits coefficient')
-    .sort({ code: 1 });
-};
-
-classSchema.statics.getBySemester = function(semesterId) {
-  return this.find({ semesterId, isActive: true })
-    .populate('subject', 'code name credits coefficient periods departmentId')
-    .populate({
-      path: 'subject',
-      populate: {
-        path: 'departmentId',
-        select: 'code name'
-      }
-    })
-    .sort({ code: 1 });
-};
-
 classSchema.statics.getBySubject = function(subjectId) {
   return this.find({ subjectId, isActive: true })
-    .populate('semester', 'code name')
+    .populate('subjectId', 'code name credits coefficient soTietLyThuyet soTietThucHanh')
     .sort({ code: 1 });
 };
 
-classSchema.statics.getByStatus = function(status) {
-  return this.find({ status, isActive: true })
-    .populate('semester', 'code name')
-    .populate('subject', 'code name')
-    .sort({ code: 1 });
+classSchema.statics.getByCode = function(code) {
+  return this.findOne({ code: code.toUpperCase(), isActive: true })
+    .populate('subjectId', 'code name credits coefficient soTietLyThuyet soTietThucHanh');
 };
 
-classSchema.statics.getBySchedule = function(dayOfWeek, startPeriod) {
-  return this.find({
-    'schedule.dayOfWeek': dayOfWeek,
-    'schedule.startPeriod': { $lte: startPeriod },
-    $expr: {
-      $gte: [
-        startPeriod,
-        { $add: ['$schedule.startPeriod', { $subtract: ['$schedule.periodsCount', 1] }] }
-      ]
-    },
-    isActive: true
-  })
-    .populate('semester', 'code name')
-    .populate('subject', 'code name')
-    .sort({ 'schedule.startPeriod': 1 });
-};
-
-classSchema.statics.getWithStats = function() {
-  return this.aggregate([
-    { $match: { isActive: true } },
-    {
-      $lookup: {
-        from: 'semesters',
-        localField: 'semesterId',
-        foreignField: '_id',
-        as: 'semester'
-      }
-    },
-    {
-      $lookup: {
-        from: 'subjects',
-        localField: 'subjectId',
-        foreignField: '_id',
-        as: 'subject'
-      }
-    },
-    {
-      $lookup: {
-        from: 'teachingassignments',
-        localField: '_id',
-        foreignField: 'classId',
-        as: 'teachingAssignments'
-      }
-    },
-    {
-      $addFields: {
-        semester: { $arrayElemAt: ['$semester', 0] },
-        subject: { $arrayElemAt: ['$subject', 0] },
-        teachingAssignmentCount: { $size: '$teachingAssignments' },
-        enrollmentPercentage: {
-          $multiply: [
-            { $divide: ['$studentCount', '$maxStudents'] },
-            100
-          ]
-        },
-        remainingSlots: { $subtract: ['$maxStudents', '$studentCount'] },
-        estimatedSalary: {
-          $multiply: [
-            { $multiply: [{ $arrayElemAt: ['$subject.credits', 0] }, { $arrayElemAt: ['$subject.coefficient', 0] }] },
-            '$studentCount'
-          ]
-        }
-      }
-    },
-    {
-      $project: {
-        teachingAssignments: 0
-      }
-    },
-    { $sort: { code: 1 } }
-  ]);
-};
-
-// Pre-save middleware
+// Pre-save middleware to calculate class coefficient
 classSchema.pre('save', function(next) {
-  if (this.isModified('code')) {
-    this.code = this.code.toUpperCase();
+  // Calculate class coefficient based on student count
+  if (this.isModified('studentCount')) {
+    if (this.studentCount <= 30) {
+      this.classCoefficient = 1.0;
+    } else if (this.studentCount <= 50) {
+      this.classCoefficient = 1.1;
+    } else if (this.studentCount <= 70) {
+      this.classCoefficient = 1.2;
+    } else if (this.studentCount <= 100) {
+      this.classCoefficient = 1.3;
+    } else {
+      this.classCoefficient = 1.4;
+    }
   }
-  
-  // Auto-update status based on student count
-  this.updateStatus();
+
+  // Auto-generate code if not provided
+  if (this.isModified('subjectId') && !this.isModified('code')) {
+    // This will be handled in the controller with proper subject info
+  }
   
   next();
 });
 
 // Pre-save validation
 classSchema.pre('save', async function(next) {
-  // Validate semester exists and is active
-  if (this.isModified('semesterId')) {
-    const Semester = mongoose.model('Semester');
-    const semester = await Semester.findById(this.semesterId);
-    if (!semester) {
-      throw new Error('Học kì không tồn tại');
-    }
-    if (!semester.isActive) {
-      throw new Error('Học kì đã bị vô hiệu hóa');
-    }
-  }
-
-  // Validate subject exists and is active
+  // Validate subject exists
   if (this.isModified('subjectId')) {
     const Subject = mongoose.model('Subject');
     const subject = await Subject.findById(this.subjectId);
     if (!subject) {
       throw new Error('Học phần không tồn tại');
     }
-    if (!subject.isActive) {
-      throw new Error('Học phần đã bị vô hiệu hóa');
-    }
   }
 
-  // Validate student count does not exceed max
+  // Validate student count doesn't exceed max
   if (this.studentCount > this.maxStudents) {
     throw new Error('Số sinh viên không được vượt quá số sinh viên tối đa');
-  }
-
-  // Validate schedule conflicts (within same semester)
-  if (this.schedule.dayOfWeek && this.schedule.startPeriod && this.schedule.periodsCount) {
-    const endPeriod = this.schedule.startPeriod + this.schedule.periodsCount - 1;
-    
-    const conflictingClasses = await this.constructor.find({
-      _id: { $ne: this._id },
-      semesterId: this.semesterId,
-      'schedule.dayOfWeek': this.schedule.dayOfWeek,
-      'schedule.room': this.schedule.room,
-      isActive: true,
-      $or: [
-        {
-          'schedule.startPeriod': { $lte: this.schedule.startPeriod },
-          $expr: {
-            $gte: [
-              this.schedule.startPeriod,
-              { $add: ['$schedule.startPeriod', { $subtract: ['$schedule.periodsCount', 1] }] }
-            ]
-          }
-        },
-        {
-          'schedule.startPeriod': { $lte: endPeriod },
-          $expr: {
-            $gte: [
-              endPeriod,
-              { $add: ['$schedule.startPeriod', { $subtract: ['$schedule.periodsCount', 1] }] }
-            ]
-          }
-        }
-      ]
-    });
-
-    if (conflictingClasses.length > 0) {
-      throw new Error(`Lịch học bị trùng với lớp ${conflictingClasses[0].code} trong cùng phòng học`);
-    }
   }
 
   next();
@@ -481,29 +261,45 @@ classSchema.pre('save', async function(next) {
 
 // Pre-remove middleware
 classSchema.pre('deleteOne', { document: true, query: false }, async function() {
-  // Check if class has teaching assignments
   const TeachingAssignment = mongoose.model('TeachingAssignment');
   const assignmentCount = await TeachingAssignment.countDocuments({ classId: this._id });
   
   if (assignmentCount > 0) {
-    throw new Error(`Không thể xóa lớp học này vì có ${assignmentCount} phân công giảng dạy đang sử dụng`);
+    throw new Error(`Không thể xóa lớp học phần này vì có ${assignmentCount} phân công giảng dạy đang sử dụng`);
   }
 });
 
-// Post-save middleware to update subject metadata
+// Post-save middleware to update metadata
 classSchema.post('save', async function() {
-  // Update subject statistics
-  const Subject = mongoose.model('Subject');
-  const classes = await this.constructor.find({ subjectId: this.subjectId });
+  // Update teaching assignment count
+  const TeachingAssignment = mongoose.model('TeachingAssignment');
+  const assignmentCount = await TeachingAssignment.countDocuments({ classId: this._id });
   
-  const totalClasses = classes.length;
-  const totalStudents = classes.reduce((sum, cls) => sum + (cls.studentCount || 0), 0);
-  const averageClassSize = totalClasses > 0 ? Math.round(totalStudents / totalClasses) : 0;
+  // Calculate total teaching hours and salary amount
+  const assignments = await TeachingAssignment.find({ classId: this._id })
+    .populate('teacherId', 'degreeId')
+    .populate('classId', 'subjectId classCoefficient')
+    .populate('classId.subjectId', 'soTietLyThuyet soTietThucHanh coefficient');
   
-  await Subject.findByIdAndUpdate(this.subjectId, {
-    'metadata.totalClasses': totalClasses,
-    'metadata.totalStudents': totalStudents,
-    'metadata.averageClassSize': averageClassSize
+  let totalTeachingHours = 0;
+  let totalSalaryAmount = 0;
+  
+  for (const assignment of assignments) {
+    if (assignment.classId && assignment.classId.subjectId) {
+      const subject = assignment.classId.subjectId;
+      const totalPeriods = subject.soTietLyThuyet + subject.soTietThucHanh;
+      const teachingHours = totalPeriods * subject.coefficient * assignment.classId.classCoefficient;
+      totalTeachingHours += teachingHours;
+      
+      // Calculate salary (this would need rate settings)
+      // totalSalaryAmount += teachingHours * ratePerHour * teacherCoefficient;
+    }
+  }
+  
+  await this.constructor.findByIdAndUpdate(this._id, {
+    'metadata.teacherAssignments': assignmentCount,
+    'metadata.totalTeachingHours': totalTeachingHours,
+    'metadata.totalSalaryAmount': totalSalaryAmount
   });
 });
 

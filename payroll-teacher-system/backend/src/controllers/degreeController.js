@@ -21,7 +21,7 @@ const getDegrees = async (req, res) => {
       data: degrees
     });
   } catch (error) {
-    console.error('Get degrees error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy danh sách bằng cấp',
@@ -49,7 +49,7 @@ const getDegree = async (req, res) => {
       data: degree
     });
   } catch (error) {
-    console.error('Get degree error:', error);
+    
     if (error.name === 'CastError') {
       return res.status(404).json({
         success: false,
@@ -103,7 +103,7 @@ const createDegree = async (req, res) => {
       data: degree
     });
   } catch (error) {
-    console.error('Create degree error:', error);
+    
     
     if (error.code === 11000) {
       return res.status(400).json({
@@ -185,7 +185,7 @@ const updateDegree = async (req, res) => {
       data: degree
     });
   } catch (error) {
-    console.error('Update degree error:', error);
+    
     
     if (error.name === 'CastError') {
       return res.status(404).json({
@@ -232,7 +232,7 @@ const deleteDegree = async (req, res) => {
       message: 'Xóa bằng cấp thành công'
     });
   } catch (error) {
-    console.error('Delete degree error:', error);
+    
     
     if (error.name === 'CastError') {
       return res.status(404).json({
@@ -267,7 +267,7 @@ const getDegreeByCode = async (req, res) => {
       data: degree
     });
   } catch (error) {
-    console.error('Get degree by code error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy thông tin bằng cấp',
@@ -299,7 +299,7 @@ const toggleDegreeStatus = async (req, res) => {
       data: degree
     });
   } catch (error) {
-    console.error('Toggle degree status error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi thay đổi trạng thái bằng cấp',

@@ -53,7 +53,7 @@ const getRateSettings = async (req, res) => {
       data: rateSettings
     });
   } catch (error) {
-    console.error('Get rate settings error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy danh sách cài đặt đơn giá',
@@ -83,7 +83,7 @@ const getRateSetting = async (req, res) => {
       data: rateSetting
     });
   } catch (error) {
-    console.error('Get rate setting error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy thông tin cài đặt đơn giá',
@@ -150,7 +150,7 @@ const createRateSetting = async (req, res) => {
       data: rateSetting
     });
   } catch (error) {
-    console.error('Create rate setting error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi tạo cài đặt đơn giá mới',
@@ -223,7 +223,7 @@ const updateRateSetting = async (req, res) => {
       data: updatedRateSetting
     });
   } catch (error) {
-    console.error('Update rate setting error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi cập nhật cài đặt đơn giá',
@@ -255,7 +255,7 @@ const deleteRateSetting = async (req, res) => {
       message: 'Đã xóa cài đặt đơn giá thành công'
     });
   } catch (error) {
-    console.error('Delete rate setting error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi xóa cài đặt đơn giá',
@@ -295,7 +295,7 @@ const getActiveRate = async (req, res) => {
       data: rateSetting
     });
   } catch (error) {
-    console.error('Get active rate error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy đơn giá đang có hiệu lực',
@@ -328,7 +328,7 @@ const getRatesByAcademicYear = async (req, res) => {
       data: rateSettings
     });
   } catch (error) {
-    console.error('Get rates by academic year error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy danh sách đơn giá theo năm học',
@@ -361,7 +361,7 @@ const getRatesBySemester = async (req, res) => {
       data: rateSettings
     });
   } catch (error) {
-    console.error('Get rates by semester error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy danh sách đơn giá theo học kỳ',
@@ -378,7 +378,7 @@ const getRates = async (req, res) => {
       .populate('semesterId', 'name startDate endDate');
     res.json(rates);
   } catch (err) {
-    console.error(err.message);
+    
     res.status(500).send('Lỗi server');
   }
 };
@@ -396,7 +396,7 @@ const getRate = async (req, res) => {
     
     res.json(rate);
   } catch (err) {
-    console.error(err.message);
+    
     if (err.kind === 'ObjectId') {
       return res.status(404).json({ msg: 'Không tìm thấy hệ số' });
     }
@@ -438,7 +438,7 @@ const createRate = async (req, res) => {
     const rate = await newRate.save();
     res.json(rate);
   } catch (err) {
-    console.error(err.message);
+    
     res.status(500).send('Lỗi server');
   }
 };
@@ -470,7 +470,7 @@ const updateRate = async (req, res) => {
 
     res.json(updatedRate);
   } catch (err) {
-    console.error(err.message);
+    
     res.status(500).send('Lỗi server');
   }
 };
@@ -487,7 +487,7 @@ const deleteRate = async (req, res) => {
     await rate.remove();
     res.json({ msg: 'Đã xóa hệ số' });
   } catch (err) {
-    console.error(err.message);
+    
     res.status(500).send('Lỗi server');
   }
 };
@@ -501,7 +501,7 @@ const getRatesByPeriod = async (req, res) => {
       .sort({ effectiveDate: -1 });
     res.json(rates);
   } catch (err) {
-    console.error(err.message);
+    
     res.status(500).send('Lỗi server');
   }
 };
@@ -528,7 +528,7 @@ const getRateStatistics = async (req, res) => {
       ratesByType
     });
   } catch (err) {
-    console.error(err.message);
+    
     res.status(500).send('Lỗi server');
   }
 };

@@ -20,7 +20,12 @@ const getAllSemesters = async (req, res) => {
 
     // Build filter
     const filter = {};
-    if (isActive !== undefined) filter.isActive = isActive === 'true';
+    // Handle isActive filter - default to true if not specified
+    if (isActive !== undefined) {
+      filter.isActive = isActive === 'true' || isActive === true;
+    } else {
+      filter.isActive = true; // Default to active semesters only
+    }
     if (academicYearId) filter.academicYearId = academicYearId;
     if (status) filter.status = status;
 
@@ -64,7 +69,7 @@ const getAllSemesters = async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
     
     query = Semester.find(filter)
-      .populate('academicYear', 'code name')
+      .populate('academicYearId', 'code name')
       .sort(sort)
       .skip(skip)
       .limit(parseInt(limit));
@@ -84,7 +89,7 @@ const getAllSemesters = async (req, res) => {
       data: semesters
     });
   } catch (error) {
-    console.error('Get semesters error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy danh sách học kỳ',
@@ -103,7 +108,7 @@ const getCurrentSemester = async (req, res) => {
       startDate: { $lte: currentDate },
       endDate: { $gte: currentDate },
       isActive: true
-    }).populate('academicYear', 'code name');
+    }).populate('academicYearId', 'code name');
 
     if (!currentSemester) {
       return res.status(404).json({
@@ -117,7 +122,7 @@ const getCurrentSemester = async (req, res) => {
       data: currentSemester
     });
   } catch (error) {
-    console.error('Get current semester error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy thông tin học kỳ hiện tại',
@@ -132,15 +137,7 @@ const getCurrentSemester = async (req, res) => {
 const getSemesterById = async (req, res) => {
   try {
     const semester = await Semester.findById(req.params.id)
-      .populate('academicYear', 'code name')
-      .populate({
-        path: 'classes',
-        select: 'code name subjectId teacherId studentCount',
-        populate: [
-          { path: 'subject', select: 'code name credits' },
-          { path: 'teacher', select: 'code fullName' }
-        ]
-      });
+      .populate('academicYearId', 'code name');
 
     if (!semester) {
       return res.status(404).json({
@@ -154,7 +151,7 @@ const getSemesterById = async (req, res) => {
       data: semester
     });
   } catch (error) {
-    console.error('Get semester error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy thông tin học kỳ',
@@ -172,7 +169,7 @@ const getSemestersByAcademicYear = async (req, res) => {
       academicYearId: req.params.academicYearId,
       isActive: true
     })
-      .populate('academicYear', 'code name')
+      .populate('academicYearId', 'code name')
       .sort('startDate');
 
     res.json({
@@ -181,7 +178,7 @@ const getSemestersByAcademicYear = async (req, res) => {
       data: semesters
     });
   } catch (error) {
-    console.error('Get semesters by academic year error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy danh sách học kỳ theo năm học',
@@ -210,7 +207,7 @@ const getUpcomingSemesters = async (req, res) => {
       data: upcomingSemesters
     });
   } catch (error) {
-    console.error('Get upcoming semesters error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy danh sách học kỳ sắp tới',
@@ -277,7 +274,7 @@ const createSemester = async (req, res) => {
       data: semester
     });
   } catch (error) {
-    console.error('Create semester error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi tạo học kỳ mới',
@@ -329,7 +326,7 @@ const updateSemester = async (req, res) => {
       data: updatedSemester
     });
   } catch (error) {
-    console.error('Update semester error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi cập nhật học kỳ',
@@ -359,7 +356,7 @@ const toggleSemesterStatus = async (req, res) => {
       data: updatedSemester
     });
   } catch (error) {
-    console.error('Toggle semester status error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi thay đổi trạng thái học kỳ',
@@ -408,7 +405,7 @@ const updateSemesterStatus = async (req, res) => {
       data: updatedSemester
     });
   } catch (error) {
-    console.error('Update semester status error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi cập nhật trạng thái học kỳ',
@@ -446,7 +443,7 @@ const deleteSemester = async (req, res) => {
       message: 'Đã xóa học kỳ thành công'
     });
   } catch (error) {
-    console.error('Delete semester error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi xóa học kỳ',
@@ -541,7 +538,7 @@ const getSemesterStatistics = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get semester statistics error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy thống kê học kỳ',

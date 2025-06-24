@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const TeachingAssignment = require('../models/TeachingAssignment');
 const Teacher = require('../models/Teacher');
 const Class = require('../models/Class');
-const Semester = require('../models/Semester');
+const AcademicYear = require('../models/AcademicYear');
 const { validationResult } = require('express-validator');
 
 // @desc    Get all teaching assignments
@@ -11,7 +11,6 @@ const { validationResult } = require('express-validator');
 const getTeachingAssignments = async (req, res) => {
   try {
     const {
-      semesterId,
       teacherId,
       classId,
       assignmentType,
@@ -25,8 +24,12 @@ const getTeachingAssignments = async (req, res) => {
 
     // Build filter
     const filter = {};
-    if (isActive !== undefined) filter.isActive = isActive === 'true';
-    if (semesterId) filter.semesterId = semesterId;
+    // Handle isActive filter - default to true if not specified
+    if (isActive !== undefined) {
+      filter.isActive = isActive === 'true' || isActive === true;
+    } else {
+      filter.isActive = true; // Default to active assignments only
+    }
     if (teacherId) filter.teacherId = teacherId;
     if (classId) filter.classId = classId;
     if (assignmentType) filter.assignmentType = assignmentType;
@@ -55,17 +58,17 @@ const getTeachingAssignments = async (req, res) => {
         },
         {
           $lookup: {
-            from: 'semesters',
-            localField: 'semesterId',
+            from: 'academicyears',
+            localField: 'academicYearId',
             foreignField: '_id',
-            as: 'semester'
+            as: 'academicYear'
           }
         },
         {
           $addFields: {
             class: { $arrayElemAt: ['$class', 0] },
             teacher: { $arrayElemAt: ['$teacher', 0] },
-            semester: { $arrayElemAt: ['$semester', 0] }
+            academicYear: { $arrayElemAt: ['$academicYear', 0] }
           }
         }
       ]);
@@ -80,16 +83,16 @@ const getTeachingAssignments = async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
     
     query = TeachingAssignment.find(filter)
-      .populate('class', 'code name subjectId')
+      .populate('classId', 'code name subjectId')
       .populate({
-        path: 'class',
+        path: 'classId',
         populate: {
-          path: 'subject',
-          select: 'code name credits'
+          path: 'subjectId',
+          select: 'code name credits soTietLyThuyet soTietThucHanh coefficient'
         }
       })
-      .populate('teacher', 'code fullName email')
-      .populate('semester', 'code name')
+      .populate('teacherId', 'code fullName email')
+      .populate('academicYearId', 'code name')
       .sort(sort)
       .skip(skip)
       .limit(parseInt(limit));
@@ -109,7 +112,7 @@ const getTeachingAssignments = async (req, res) => {
       data: assignments
     });
   } catch (error) {
-    console.error('Get teaching assignments error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy danh sách phân công giảng dạy',
@@ -124,16 +127,16 @@ const getTeachingAssignments = async (req, res) => {
 const getTeachingAssignment = async (req, res) => {
   try {
     const assignment = await TeachingAssignment.findById(req.params.id)
-      .populate('class', 'code name subjectId schedule')
+      .populate('classId', 'code name subjectId schedule')
       .populate({
-        path: 'class',
+        path: 'classId',
         populate: {
-          path: 'subject',
+          path: 'subjectId',
           select: 'code name credits coefficient'
         }
       })
-      .populate('teacher', 'code fullName email phone')
-      .populate('semester', 'code name startDate endDate');
+      .populate('teacherId', 'employeeId fullName email phone')
+      .populate('academicYearId', 'code name startDate endDate');
 
     if (!assignment) {
       return res.status(404).json({
@@ -147,7 +150,7 @@ const getTeachingAssignment = async (req, res) => {
       data: assignment
     });
   } catch (error) {
-    console.error('Get teaching assignment error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy thông tin phân công giảng dạy',
@@ -165,15 +168,15 @@ const getAssignmentsByTeacher = async (req, res) => {
       teacherId: req.params.teacherId,
       isActive: true
     })
-      .populate('class', 'code name subjectId schedule')
+      .populate('classId', 'code name subjectId schedule')
       .populate({
-        path: 'class',
+        path: 'classId',
         populate: {
-          path: 'subject',
+          path: 'subjectId',
           select: 'code name credits'
         }
       })
-      .populate('semester', 'code name')
+      .populate('academicYearId', 'code name')
       .sort('-createdAt');
 
     res.json({
@@ -182,7 +185,7 @@ const getAssignmentsByTeacher = async (req, res) => {
       data: assignments
     });
   } catch (error) {
-    console.error('Get assignments by teacher error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy danh sách phân công theo giảng viên',
@@ -210,7 +213,7 @@ const getAssignmentsByClass = async (req, res) => {
       data: assignments
     });
   } catch (error) {
-    console.error('Get assignments by class error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy danh sách phân công theo lớp học',
@@ -223,48 +226,95 @@ const getAssignmentsByClass = async (req, res) => {
 // @route   POST /api/teaching-assignments
 // @access  Private
 const createTeachingAssignment = async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
-
   try {
-    const { classId, teacherId, semesterId, assignmentType, hoursAssigned } = req.body;
-
-    // Check if class exists
-    const classExists = await Class.findById(classId);
-    if (!classExists) {
-      return res.status(404).json({ msg: 'Lớp học không tồn tại' });
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
+      });
     }
+
+    const {
+      code,
+      teacherId,
+      classId,
+      academicYearId,
+      status,
+      notes
+    } = req.body;
+
+    // Check if class exists and get subject info
+    const classExists = await Class.findById(classId).populate('subjectId', 'code name soTietLyThuyet soTietThucHanh coefficient');
+    if (!classExists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Lớp học phần không tồn tại'
+      });
+    }
+
+    // Calculate total periods from subject
+    const totalPeriods = classExists.subjectId.soTietLyThuyet + classExists.subjectId.soTietThucHanh;
 
     // Check if teacher exists
     const teacher = await Teacher.findById(teacherId);
     if (!teacher) {
-      return res.status(404).json({ msg: 'Giảng viên không tồn tại' });
+      return res.status(404).json({
+        success: false,
+        message: 'Giảng viên không tồn tại'
+      });
     }
 
-    // Check for schedule conflicts
-    const existingAssignments = await TeachingAssignment.find({
-      teacherId,
-      semesterId,
-      status: { $ne: 'cancelled' }
-    }).populate('classId', 'schedule');
+    // Check if academic year exists
+    const academicYear = await AcademicYear.findById(academicYearId);
+    if (!academicYear) {
+      return res.status(404).json({
+        success: false,
+        message: 'Năm học không tồn tại'
+      });
+    }
+
+    // Auto-generate code if not provided
+    let finalCode = code;
+    if (!finalCode) {
+      const assignmentCount = await TeachingAssignment.countDocuments({
+        teacherId,
+        academicYearId
+      });
+      finalCode = `${teacher.code}_${classExists.code}_${assignmentCount + 1}`;
+    }
 
     // Create new assignment
-    const newAssignment = new TeachingAssignment({
-      classId,
+    const assignmentData = {
+      code: finalCode,
       teacherId,
-      semesterId,
-      assignmentType,
-      hoursAssigned,
-      status: 'assigned'
-    });
+      classId,
+      academicYearId,
+      periods: totalPeriods, // Use periods from subject
+      status: status || 'assigned',
+      notes
+    };
 
-    const assignment = await newAssignment.save();
-    res.json(assignment);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Lỗi server');
+    const newAssignment = await TeachingAssignment.create(assignmentData);
+    
+    // Populate the created assignment
+    const populatedAssignment = await TeachingAssignment.findById(newAssignment._id)
+      .populate('teacherId', 'code fullName email')
+      .populate('classId', 'code name')
+      .populate('academicYearId', 'code name');
+
+    res.status(201).json({
+      success: true,
+      message: 'Tạo phân công giảng dạy thành công',
+      data: populatedAssignment
+    });
+  } catch (error) {
+    console.error('Error creating teaching assignment:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi tạo phân công giảng dạy',
+      error: error.message
+    });
   }
 };
 
@@ -272,32 +322,102 @@ const createTeachingAssignment = async (req, res) => {
 // @route   PUT /api/teaching-assignments/:id
 // @access  Private
 const updateTeachingAssignment = async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
-
   try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
+      });
+    }
+
     const assignment = await TeachingAssignment.findById(req.params.id);
     if (!assignment) {
-      return res.status(404).json({ msg: 'Không tìm thấy phân công' });
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy phân công'
+      });
+    }
+
+    const {
+      teacherId,
+      classId,
+      academicYearId,
+      status,
+      hoursAssigned,
+      notes
+    } = req.body;
+
+    // Validate teacher exists
+    if (teacherId) {
+      const teacher = await Teacher.findById(teacherId);
+      if (!teacher) {
+        return res.status(404).json({
+          success: false,
+          message: 'Giảng viên không tồn tại'
+        });
+      }
+    }
+
+    // Validate class exists
+    if (classId) {
+      const classExists = await Class.findById(classId);
+      if (!classExists) {
+        return res.status(404).json({
+          success: false,
+          message: 'Lớp học phần không tồn tại'
+        });
+      }
+    }
+
+    // Validate academic year exists
+    if (academicYearId) {
+      const academicYear = await AcademicYear.findById(academicYearId);
+      if (!academicYear) {
+        return res.status(404).json({
+          success: false,
+          message: 'Năm học không tồn tại'
+        });
+      }
     }
 
     // Update fields
     const updateFields = {};
-    if (req.body.hoursAssigned) updateFields.hoursAssigned = req.body.hoursAssigned;
-    if (req.body.status) updateFields.status = req.body.status;
+    if (teacherId) updateFields.teacherId = teacherId;
+    if (classId) updateFields.classId = classId;
+    if (academicYearId) updateFields.academicYearId = academicYearId;
+    if (status) updateFields.status = status;
+    if (hoursAssigned !== undefined) updateFields.hoursAssigned = hoursAssigned;
+    if (notes !== undefined) updateFields.notes = notes;
 
     const updatedAssignment = await TeachingAssignment.findByIdAndUpdate(
       req.params.id,
       { $set: updateFields },
       { new: true }
-    );
+    )
+      .populate('teacherId', 'code fullName email')
+      .populate({
+        path: 'classId',
+        select: 'code name subjectId',
+        populate: {
+          path: 'subjectId',
+          select: 'code name credits soTietLyThuyet soTietThucHanh coefficient'
+        }
+      })
+      .populate('academicYearId', 'code name');
 
-    res.json(updatedAssignment);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Lỗi server');
+    res.json({
+      success: true,
+      message: 'Cập nhật phân công thành công',
+      data: updatedAssignment
+    });
+  } catch (error) {
+    console.error('Error updating teaching assignment:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi cập nhật phân công giảng dạy',
+      error: error.message
+    });
   }
 };
 
@@ -308,29 +428,40 @@ const deleteTeachingAssignment = async (req, res) => {
   try {
     const assignment = await TeachingAssignment.findById(req.params.id);
     if (!assignment) {
-      return res.status(404).json({ msg: 'Không tìm thấy phân công' });
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy phân công'
+      });
     }
 
-    await assignment.remove();
-    res.json({ msg: 'Đã xóa phân công' });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Lỗi server');
+    await TeachingAssignment.findByIdAndDelete(req.params.id);
+    
+    res.json({
+      success: true,
+      message: 'Đã xóa phân công thành công'
+    });
+  } catch (error) {
+    console.error('Error deleting teaching assignment:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi xóa phân công giảng dạy',
+      error: error.message
+    });
   }
 };
 
 // @desc    Check teacher availability
 // @route   GET /api/teaching-assignments/availability/check
 // @access  Public
-const checkTeacherAvailability = async (teacherId, semesterId, classId, excludeAssignmentId = null) => {
+const checkTeacherAvailability = async (teacherId, academicYearId, classId, excludeAssignmentId = null) => {
   // Get the class schedule
   const classToCheck = await Class.findById(classId).select('schedule');
   if (!classToCheck || !classToCheck.schedule) return false;
 
-  // Get all classes assigned to the teacher in the semester
+  // Get all classes assigned to the teacher in the academic year
   const filter = {
     teacherId,
-    semesterId,
+    academicYearId,
     isActive: true
   };
   if (excludeAssignmentId) {
@@ -338,13 +469,13 @@ const checkTeacherAvailability = async (teacherId, semesterId, classId, excludeA
   }
 
   const teacherAssignments = await TeachingAssignment.find(filter)
-    .populate('class', 'schedule');
+    .populate('classId', 'schedule');
 
   // Check for schedule conflicts
   for (const assignment of teacherAssignments) {
-    if (!assignment.class || !assignment.class.schedule) continue;
+    if (!assignment.classId || !assignment.classId.schedule) continue;
 
-    for (const existingSlot of assignment.class.schedule) {
+    for (const existingSlot of assignment.classId.schedule) {
       for (const newSlot of classToCheck.schedule) {
         if (existingSlot.dayOfWeek === newSlot.dayOfWeek) {
           // Check if time slots overlap
@@ -392,7 +523,7 @@ const bulkAssignTeachers = async (req, res) => {
 
     res.json(createdAssignments);
   } catch (err) {
-    console.error(err.message);
+    
     res.status(500).send('Lỗi server');
   }
 };
@@ -428,7 +559,7 @@ const getTeachingAssignmentStatistics = async (req, res) => {
       assignmentsByType
     });
   } catch (err) {
-    console.error(err.message);
+    
     res.status(500).send('Lỗi server');
   }
 };

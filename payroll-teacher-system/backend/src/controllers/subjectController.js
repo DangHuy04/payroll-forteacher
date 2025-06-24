@@ -9,9 +9,6 @@ const getSubjects = async (req, res) => {
   try {
     const {
       departmentId,
-      subjectType,
-      level,
-      isActive = true,
       includeStats = false,
       page = 1,
       limit = 50,
@@ -20,10 +17,7 @@ const getSubjects = async (req, res) => {
 
     // Build filter
     const filter = {};
-    if (isActive !== undefined) filter.isActive = isActive === 'true';
     if (departmentId) filter.departmentId = departmentId;
-    if (subjectType) filter.subjectType = subjectType;
-    if (level) filter.level = level;
 
     let query;
     
@@ -41,8 +35,8 @@ const getSubjects = async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
     
     query = Subject.find(filter)
-      .populate('department', 'code name')
-      .populate('prerequisiteSubjects', 'code name credits')
+      .populate('departmentId', 'code name')
+      .populate('prerequisites', 'code name credits')
       .sort(sort)
       .skip(skip)
       .limit(parseInt(limit));
@@ -62,7 +56,7 @@ const getSubjects = async (req, res) => {
       data: subjects
     });
   } catch (error) {
-    console.error('Get subjects error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy danh sách học phần',
@@ -77,8 +71,8 @@ const getSubjects = async (req, res) => {
 const getSubject = async (req, res) => {
   try {
     const subject = await Subject.findById(req.params.id)
-      .populate('department', 'code name description')
-      .populate('prerequisiteSubjects', 'code name credits coefficient');
+      .populate('departmentId', 'code name description')
+      .populate('prerequisites', 'code name credits coefficient');
 
     if (!subject) {
       return res.status(404).json({
@@ -92,7 +86,7 @@ const getSubject = async (req, res) => {
       data: subject
     });
   } catch (error) {
-    console.error('Get subject error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy thông tin học phần',
@@ -120,7 +114,7 @@ const getSubjectByCode = async (req, res) => {
       data: subject
     });
   } catch (error) {
-    console.error('Get subject by code error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy thông tin học phần',
@@ -147,7 +141,7 @@ const createSubject = async (req, res) => {
     const subject = await Subject.create(req.body);
 
     // Populate the created subject
-    await subject.populate('department', 'code name');
+    await subject.populate('departmentId', 'code name');
     
     res.status(201).json({
       success: true,
@@ -155,7 +149,7 @@ const createSubject = async (req, res) => {
       data: subject
     });
   } catch (error) {
-    console.error('Create subject error:', error);
+    
     
     if (error.code === 11000) {
       return res.status(400).json({
@@ -219,7 +213,7 @@ const updateSubject = async (req, res) => {
       data: updatedSubject
     });
   } catch (error) {
-    console.error('Update subject error:', error);
+    
     
     if (error.code === 11000) {
       return res.status(400).json({
@@ -265,42 +259,10 @@ const deleteSubject = async (req, res) => {
       message: 'Xóa học phần thành công'
     });
   } catch (error) {
-    console.error('Delete subject error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi xóa học phần',
-      error: error.message
-    });
-  }
-};
-
-// @desc    Toggle subject status
-// @route   PATCH /api/subjects/:id/toggle-status
-// @access  Private
-const toggleSubjectStatus = async (req, res) => {
-  try {
-    const subject = await Subject.findById(req.params.id);
-    
-    if (!subject) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy học phần'
-      });
-    }
-
-    subject.isActive = !subject.isActive;
-    await subject.save();
-
-    res.json({
-      success: true,
-      message: `${subject.isActive ? 'Kích hoạt' : 'Vô hiệu hóa'} học phần thành công`,
-      data: subject
-    });
-  } catch (error) {
-    console.error('Toggle subject status error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi khi thay đổi trạng thái học phần',
       error: error.message
     });
   }
@@ -319,54 +281,10 @@ const getSubjectsByDepartment = async (req, res) => {
       data: subjects
     });
   } catch (error) {
-    console.error('Get subjects by department error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy danh sách học phần theo khoa',
-      error: error.message
-    });
-  }
-};
-
-// @desc    Get subjects by type
-// @route   GET /api/subjects/type/:type
-// @access  Public
-const getSubjectsByType = async (req, res) => {
-  try {
-    const subjects = await Subject.getByType(req.params.type);
-
-    res.json({
-      success: true,
-      count: subjects.length,
-      data: subjects
-    });
-  } catch (error) {
-    console.error('Get subjects by type error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi khi lấy danh sách học phần theo loại',
-      error: error.message
-    });
-  }
-};
-
-// @desc    Get subjects by level
-// @route   GET /api/subjects/level/:level
-// @access  Public
-const getSubjectsByLevel = async (req, res) => {
-  try {
-    const subjects = await Subject.getByLevel(req.params.level);
-
-    res.json({
-      success: true,
-      count: subjects.length,
-      data: subjects
-    });
-  } catch (error) {
-    console.error('Get subjects by level error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi khi lấy danh sách học phần theo cấp độ',
       error: error.message
     });
   }
@@ -382,12 +300,6 @@ const getSubjectStatistics = async (req, res) => {
         $group: {
           _id: null,
           totalSubjects: { $sum: 1 },
-          activeSubjects: {
-            $sum: { $cond: [{ $eq: ['$isActive', true] }, 1, 0] }
-          },
-          inactiveSubjects: {
-            $sum: { $cond: [{ $eq: ['$isActive', false] }, 1, 0] }
-          },
           totalCredits: { $sum: '$credits' },
           averageCredits: { $avg: '$credits' },
           averageCoefficient: { $avg: '$coefficient' },
@@ -397,32 +309,7 @@ const getSubjectStatistics = async (req, res) => {
       }
     ]);
 
-    const typeStats = await Subject.aggregate([
-      { $match: { isActive: true } },
-      {
-        $group: {
-          _id: '$subjectType',
-          count: { $sum: 1 },
-          totalCredits: { $sum: '$credits' },
-          averageCredits: { $avg: '$credits' }
-        }
-      }
-    ]);
-
-    const levelStats = await Subject.aggregate([
-      { $match: { isActive: true } },
-      {
-        $group: {
-          _id: '$level',
-          count: { $sum: 1 },
-          totalCredits: { $sum: '$credits' },
-          averageCredits: { $avg: '$credits' }
-        }
-      }
-    ]);
-
     const departmentStats = await Subject.aggregate([
-      { $match: { isActive: true } },
       {
         $lookup: {
           from: 'departments',
@@ -449,20 +336,17 @@ const getSubjectStatistics = async (req, res) => {
       data: {
         overview: stats[0] || {
           totalSubjects: 0,
-          activeSubjects: 0,
-          inactiveSubjects: 0,
           totalCredits: 0,
           averageCredits: 0,
+          averageCoefficient: 0,
           totalClasses: 0,
           totalStudents: 0
         },
-        byType: typeStats,
-        byLevel: levelStats,
         byDepartment: departmentStats
       }
     });
   } catch (error) {
-    console.error('Get subject statistics error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy thống kê học phần',
@@ -478,9 +362,6 @@ module.exports = {
   createSubject,
   updateSubject,
   deleteSubject,
-  toggleSubjectStatus,
   getSubjectsByDepartment,
-  getSubjectsByType,
-  getSubjectsByLevel,
   getSubjectStatistics
 }; 

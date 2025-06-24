@@ -22,11 +22,6 @@ const teachingAssignmentSchema = new mongoose.Schema({
     ref: 'Class',
     required: [true, 'Lớp học phần là bắt buộc']
   },
-  semesterId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Semester',
-    required: [true, 'Học kì là bắt buộc']
-  },
   academicYearId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'AcademicYear',
@@ -44,12 +39,12 @@ const teachingAssignmentSchema = new mongoose.Schema({
     required: true
   },
   
-  // Teaching Load - similar to Payroll Engine's calculation bases
-  teachingHours: {
+  // Teaching Load - periods from subject
+  periods: {
     type: Number,
-    required: [true, 'Số giờ dạy là bắt buộc'],
-    min: [0, 'Số giờ dạy không được âm'],
-    max: [200, 'Số giờ dạy không được quá 200 giờ/học kì']
+    required: [true, 'Số tiết học là bắt buộc'],
+    min: [0, 'Số tiết học không được âm'],
+    max: [300, 'Số tiết học không được quá 300 tiết/học kì']
   },
   
   // Coefficient - inspired by Payroll Engine's rate calculations
@@ -215,9 +210,9 @@ const teachingAssignmentSchema = new mongoose.Schema({
 
 // Indexes for performance
 teachingAssignmentSchema.index({ code: 1 });
-teachingAssignmentSchema.index({ teacherId: 1, semesterId: 1 });
+teachingAssignmentSchema.index({ teacherId: 1, academicYearId: 1 });
 teachingAssignmentSchema.index({ classId: 1 });
-teachingAssignmentSchema.index({ semesterId: 1, status: 1 });
+teachingAssignmentSchema.index({ academicYearId: 1, status: 1 });
 teachingAssignmentSchema.index({ 'schedule.startDate': 1, 'schedule.endDate': 1 });
 teachingAssignmentSchema.index({ isActive: 1, status: 1 });
 
@@ -245,14 +240,6 @@ teachingAssignmentSchema.virtual('class', {
   justOne: true
 });
 
-// Virtual for semester info
-teachingAssignmentSchema.virtual('semester', {
-  ref: 'Semester',
-  localField: 'semesterId',
-  foreignField: '_id',
-  justOne: true
-});
-
 // Virtual for academic year info
 teachingAssignmentSchema.virtual('academicYear', {
   ref: 'AcademicYear',
@@ -261,10 +248,9 @@ teachingAssignmentSchema.virtual('academicYear', {
   justOne: true
 });
 
-// Virtual for total teaching hours
-teachingAssignmentSchema.virtual('totalWorkloadHours').get(function() {
-  const { lectureHours, practiceHours, labHours, otherHours } = this.workloadDistribution;
-  return (lectureHours || 0) + (practiceHours || 0) + (labHours || 0) + (otherHours || 0);
+// Virtual for total teaching hours (convert periods to hours)
+teachingAssignmentSchema.virtual('totalTeachingHours').get(function() {
+  return this.periods || 0;
 });
 
 // Virtual for estimated compensation
@@ -291,18 +277,13 @@ teachingAssignmentSchema.pre('save', function(next) {
     }
   }
 
-  // Validate academic year matches with class's semester
-  if (this.isModified('classId') || this.isModified('academicYearId')) {
+  // Basic validation
+  if (this.isModified('classId')) {
     const Class = mongoose.model('Class');
     Class.findById(this.classId)
-      .populate('semester')
       .then(class_ => {
         if (!class_) {
           return next(new Error('Lớp học phần không tồn tại'));
-        }
-
-        if (class_.semester.academicYearId.toString() !== this.academicYearId.toString()) {
-          return next(new Error('Năm học không khớp với kỳ học của lớp'));
         }
         next();
       })
@@ -358,31 +339,24 @@ teachingAssignmentSchema.statics.getActive = function() {
   return this.find({ isActive: true })
     .populate('teacher', 'code fullName email')
     .populate('class', 'code name')
-    .populate('semester', 'code name')
+    .populate('academicYear', 'code name')
     .sort({ 'schedule.startDate': -1 });
 };
 
-teachingAssignmentSchema.statics.findByTeacher = function(teacherId, semesterId = null) {
+teachingAssignmentSchema.statics.findByTeacher = function(teacherId, academicYearId = null) {
   const query = { teacherId, isActive: true };
-  if (semesterId) query.semesterId = semesterId;
+  if (academicYearId) query.academicYearId = academicYearId;
   
   return this.find(query)
     .populate('class', 'code name')
-    .populate('semester', 'code name')
-    .sort({ 'schedule.startDate': -1 });
-};
-
-teachingAssignmentSchema.statics.findBySemester = function(semesterId) {
-  return this.find({ semesterId, isActive: true })
-    .populate('teacher', 'code fullName')
-    .populate('class', 'code name')
+    .populate('academicYear', 'code name')
     .sort({ 'schedule.startDate': -1 });
 };
 
 teachingAssignmentSchema.statics.findByClass = function(classId) {
   return this.find({ classId, isActive: true })
     .populate('teacher', 'code fullName email')
-    .populate('semester', 'code name')
+    .populate('academicYear', 'code name')
     .sort({ assignmentType: 1 });
 };
 
@@ -406,7 +380,7 @@ teachingAssignmentSchema.statics.checkConflicts = function(teacherId, startDate,
   
   return this.find(query)
     .populate('class', 'code name')
-    .populate('semester', 'code name');
+    .populate('academicYear', 'code name');
 };
 
 // Get teaching statistics

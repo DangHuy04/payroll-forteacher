@@ -77,7 +77,7 @@ const getAllTeachers = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get teachers error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy danh sách giáo viên',
@@ -121,7 +121,7 @@ const getTeacherById = async (req, res) => {
       context: contextInfo
     });
   } catch (error) {
-    console.error('Get teacher by ID error:', error);
+    
     if (error.name === 'CastError') {
       return res.status(400).json({
         success: false,
@@ -160,7 +160,7 @@ const getTeacherByCode = async (req, res) => {
       data: teacher
     });
   } catch (error) {
-    console.error('Get teacher by code error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy thông tin giáo viên',
@@ -206,7 +206,8 @@ const createTeacher = async (req, res) => {
       $or: [
         { code: code.toUpperCase() },
         { email: email.toLowerCase() },
-        { citizenId }
+        ...(citizenId ? [{ identityNumber: citizenId }] : []),
+        ...(identityNumber ? [{ identityNumber }] : [])
       ]
     });
 
@@ -250,7 +251,7 @@ const createTeacher = async (req, res) => {
       birthDate: birthDate ? new Date(birthDate) : undefined,
       hireDate: hireDate ? new Date(hireDate) : new Date(),
       address,
-      citizenId,
+      identityNumber: citizenId || identityNumber,
       taxCode,
       emergencyContact
     });
@@ -269,7 +270,7 @@ const createTeacher = async (req, res) => {
       data: teacher
     });
   } catch (error) {
-    console.error('Create teacher error:', error);
+    
     
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map(err => err.message);
@@ -285,7 +286,7 @@ const createTeacher = async (req, res) => {
       const fieldNames = {
         code: 'mã giáo viên',
         email: 'email',
-        citizenId: 'CCCD'
+        identityNumber: 'CCCD'
       };
       return res.status(400).json({
         success: false,
@@ -338,18 +339,20 @@ const updateTeacher = async (req, res) => {
       hireDate,
       address,
       citizenId,
+      identityNumber,
       taxCode,
       emergencyContact
     } = req.body;
 
     // Check for conflicts with other teachers
-    if (code || email || citizenId) {
+    if (code || email || citizenId || identityNumber) {
       const conflictQuery = { _id: { $ne: teacher._id } };
       const orConditions = [];
       
       if (code) orConditions.push({ code: code.toUpperCase() });
       if (email) orConditions.push({ email: email.toLowerCase() });
-      if (citizenId) orConditions.push({ citizenId });
+      if (citizenId) orConditions.push({ identityNumber: citizenId });
+      if (identityNumber) orConditions.push({ identityNumber });
       
       if (orConditions.length > 0) {
         conflictQuery.$or = orConditions;
@@ -397,7 +400,8 @@ const updateTeacher = async (req, res) => {
     if (birthDate !== undefined) teacher.birthDate = birthDate ? new Date(birthDate) : null;
     if (hireDate !== undefined) teacher.hireDate = hireDate ? new Date(hireDate) : null;
     if (address !== undefined) teacher.address = address;
-    if (citizenId !== undefined) teacher.citizenId = citizenId;
+    if (citizenId !== undefined) teacher.identityNumber = citizenId;
+    if (identityNumber !== undefined) teacher.identityNumber = identityNumber;
     if (taxCode !== undefined) teacher.taxCode = taxCode;
     if (emergencyContact !== undefined) teacher.emergencyContact = emergencyContact;
 
@@ -415,7 +419,7 @@ const updateTeacher = async (req, res) => {
       data: teacher
     });
   } catch (error) {
-    console.error('Update teacher error:', error);
+    
 
     if (error.name === 'CastError') {
       return res.status(400).json({
@@ -438,7 +442,7 @@ const updateTeacher = async (req, res) => {
       const fieldNames = {
         code: 'mã giáo viên',
         email: 'email',
-        citizenId: 'CCCD'
+        identityNumber: 'CCCD'
       };
       return res.status(400).json({
         success: false,
@@ -477,7 +481,7 @@ const toggleTeacherStatus = async (req, res) => {
       data: teacher
     });
   } catch (error) {
-    console.error('Toggle teacher status error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi thay đổi trạng thái giáo viên',
@@ -507,7 +511,7 @@ const deleteTeacher = async (req, res) => {
       message: 'Xóa giáo viên thành công'
     });
   } catch (error) {
-    console.error('Delete teacher error:', error);
+    
 
     if (error.name === 'CastError') {
       return res.status(400).json({
@@ -581,7 +585,7 @@ const getTeacherStatistics = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get teacher statistics error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy thống kê giáo viên',
@@ -694,7 +698,7 @@ const getTeachersSummaryStatistics = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get teachers summary statistics error:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy thống kê tổng quan giáo viên',

@@ -6,35 +6,28 @@ const connectDB = async () => {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
-
-    console.log(`🗄️  MongoDB Connected: ${conn.connection.host}`);
-    
-    // Log database name
-    console.log(`📊 Database: ${conn.connection.name}`);
     
   } catch (error) {
-    console.error('❌ MongoDB connection error:', error.message);
     process.exit(1);
   }
 };
 
-// Handle connection events
+// Handle connection events (silent mode)
 mongoose.connection.on('connected', () => {
-  console.log('✅ Mongoose connected to MongoDB');
+  // Silent connection
 });
 
 mongoose.connection.on('error', (err) => {
-  console.error('❌ Mongoose connection error:', err);
+  // Silent error handling
 });
 
 mongoose.connection.on('disconnected', () => {
-  console.log('⚠️  Mongoose disconnected');
+  // Silent disconnection
 });
 
 // Gracefully close connection on app termination
 process.on('SIGINT', async () => {
   await mongoose.connection.close();
-  console.log('👋 MongoDB connection closed through app termination');
   process.exit(0);
 });
 

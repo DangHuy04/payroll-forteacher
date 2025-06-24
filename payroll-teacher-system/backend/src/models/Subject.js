@@ -35,16 +35,28 @@ const subjectSchema = new mongoose.Schema({
     max: [3.0, 'Hệ số học phần không được quá 3.0'],
     default: 1.0
   },
-  periods: {
+  soTietLyThuyet: {
     type: Number,
-    required: [true, 'Số tiết là bắt buộc'],
-    min: [15, 'Số tiết phải từ 15'],
-    max: [150, 'Số tiết không được quá 150'],
+    required: [true, 'Số tiết lý thuyết là bắt buộc'],
+    min: [0, 'Số tiết lý thuyết phải >= 0'],
+    max: [150, 'Số tiết lý thuyết không được quá 150'],
     validate: {
       validator: function(value) {
         return Number.isInteger(value);
       },
-      message: 'Số tiết phải là số nguyên'
+      message: 'Số tiết lý thuyết phải là số nguyên'
+    }
+  },
+  soTietThucHanh: {
+    type: Number,
+    required: [true, 'Số tiết thực hành là bắt buộc'],
+    min: [0, 'Số tiết thực hành phải >= 0'],
+    max: [150, 'Số tiết thực hành không được quá 150'],
+    validate: {
+      validator: function(value) {
+        return Number.isInteger(value);
+      },
+      message: 'Số tiết thực hành phải là số nguyên'
     }
   },
   departmentId: {
@@ -102,8 +114,7 @@ const subjectSchema = new mongoose.Schema({
 
 // Index for performance
 subjectSchema.index({ code: 1 });
-subjectSchema.index({ departmentId: 1, isActive: 1 });
-subjectSchema.index({ subjectType: 1, level: 1 });
+subjectSchema.index({ departmentId: 1 });
 subjectSchema.index({ credits: 1, coefficient: 1 });
 
 // Virtual for department info
@@ -129,9 +140,14 @@ subjectSchema.virtual('prerequisiteSubjects', {
   foreignField: '_id'
 });
 
+// Virtual for total periods (ly thuyet + thuc hanh)
+subjectSchema.virtual('totalPeriods').get(function() {
+  return this.soTietLyThuyet + this.soTietThucHanh;
+});
+
 // Virtual for total teaching hours
 subjectSchema.virtual('totalTeachingHours').get(function() {
-  return this.periods * this.coefficient;
+  return this.totalPeriods * this.coefficient;
 });
 
 // Virtual for salary coefficient (based on credits and coefficient)
@@ -142,28 +158,6 @@ subjectSchema.virtual('salaryCoefficient').get(function() {
 // Virtual for display name
 subjectSchema.virtual('displayName').get(function() {
   return `${this.code} - ${this.name}`;
-});
-
-// Virtual for subject type display
-subjectSchema.virtual('subjectTypeDisplay').get(function() {
-  const types = {
-    'general': 'Học phần chung',
-    'major': 'Học phần chuyên ngành',
-    'specialization': 'Học phần chuyên sâu',
-    'elective': 'Học phần tự chọn',
-    'internship': 'Thực tập'
-  };
-  return types[this.subjectType] || this.subjectType;
-});
-
-// Virtual for level display
-subjectSchema.virtual('levelDisplay').get(function() {
-  const levels = {
-    'undergraduate': 'Đại học',
-    'graduate': 'Thạc sĩ',
-    'postgraduate': 'Tiến sĩ'
-  };
-  return levels[this.level] || this.level;
 });
 
 // Methods
@@ -182,39 +176,20 @@ subjectSchema.methods.isPrerequisiteFor = async function() {
 };
 
 // Static methods
-subjectSchema.statics.getActive = function() {
-  return this.find({ isActive: true })
-    .populate('department', 'code name')
-    .sort({ code: 1 });
-};
-
 subjectSchema.statics.getByDepartment = function(departmentId) {
-  return this.find({ departmentId, isActive: true })
+  return this.find({ departmentId })
     .populate('department', 'code name')
     .sort({ code: 1 });
 };
 
 subjectSchema.statics.getByCode = function(code) {
-  return this.findOne({ code: code.toUpperCase(), isActive: true })
+  return this.findOne({ code: code.toUpperCase() })
     .populate('department', 'code name')
     .populate('prerequisiteSubjects', 'code name credits');
 };
 
-subjectSchema.statics.getByType = function(subjectType) {
-  return this.find({ subjectType, isActive: true })
-    .populate('department', 'code name')
-    .sort({ code: 1 });
-};
-
-subjectSchema.statics.getByLevel = function(level) {
-  return this.find({ level, isActive: true })
-    .populate('department', 'code name')
-    .sort({ code: 1 });
-};
-
 subjectSchema.statics.getWithStats = function() {
   return this.aggregate([
-    { $match: { isActive: true } },
     {
       $lookup: {
         from: 'departments',
@@ -243,7 +218,7 @@ subjectSchema.statics.getWithStats = function() {
             0
           ]
         },
-        totalTeachingHours: { $multiply: ['$periods', '$coefficient'] },
+        totalTeachingHours: { $multiply: [{ $add: ['$soTietLyThuyet', '$soTietThucHanh'] }, '$coefficient'] },
         salaryCoefficient: { $multiply: ['$credits', '$coefficient'] }
       }
     },
@@ -288,8 +263,14 @@ subjectSchema.pre('save', async function(next) {
   }
 
   // Calculate periods based on credits if not provided
-  if (this.isModified('credits') && !this.isModified('periods')) {
-    this.periods = Math.round(this.credits * 15); // Mặc định 15 tiết/tín chỉ
+  if (this.isModified('credits') && !this.isModified('soTietLyThuyet') && !this.isModified('soTietThucHanh')) {
+    this.soTietLyThuyet = Math.round(this.credits * 15); // Mặc định 15 tiết/tín chỉ
+    this.soTietThucHanh = Math.round(this.credits * 15); // Mặc định 15 tiết/tín chỉ
+  }
+
+  // Validate total periods
+  if (this.soTietLyThuyet + this.soTietThucHanh < 1) {
+    return next(new Error('Tổng số tiết phải >= 1'));
   }
 
   next();

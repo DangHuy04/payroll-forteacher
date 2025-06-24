@@ -6,184 +6,110 @@ const {
   createClass,
   updateClass,
   deleteClass,
-  getClassesBySemester,
+  getClassesByAcademicYear,
   getClassStatistics
 } = require('../controllers/classController');
+
 
 const router = express.Router();
 
 // Validation middleware
 const validateClassCreation = [
   body('code')
+    .trim()
     .notEmpty()
-    .withMessage('Mã lớp học phần là bắt buộc')
-    .isLength({ min: 2, max: 20 })
-    .withMessage('Mã lớp học phần phải từ 2-20 ký tự')
-    .matches(/^[A-Z0-9.-]+$/)
-    .withMessage('Mã lớp học phần chỉ được chứa chữ cái hoa, số, dấu chấm và gạch ngang'),
+    .withMessage('Mã lớp học là bắt buộc')
+    .isLength({ min: 3, max: 20 })
+    .withMessage('Mã lớp học phải có độ dài từ 3-20 ký tự')
+    .matches(/^[A-Z0-9_-]+$/i)
+    .withMessage('Mã lớp học chỉ được chứa chữ cái, số, gạch dưới và gạch ngang'),
   
   body('name')
+    .trim()
     .notEmpty()
-    .withMessage('Tên lớp học phần là bắt buộc')
-    .isLength({ min: 2, max: 200 })
-    .withMessage('Tên lớp học phần phải từ 2-200 ký tự'),
-  
-  body('semesterId')
-    .notEmpty()
-    .withMessage('Học kì là bắt buộc')
-    .isMongoId()
-    .withMessage('Học kì không hợp lệ'),
+    .withMessage('Tên lớp học là bắt buộc')
+    .isLength({ min: 5, max: 200 })
+    .withMessage('Tên lớp học phải có độ dài từ 5-200 ký tự'),
   
   body('subjectId')
-    .notEmpty()
-    .withMessage('Học phần là bắt buộc')
     .isMongoId()
-    .withMessage('Học phần không hợp lệ'),
+    .withMessage('ID học phần không hợp lệ'),
+  
+  body('academicYearId')
+    .isMongoId()
+    .withMessage('ID năm học không hợp lệ'),
   
   body('studentCount')
     .isInt({ min: 1, max: 200 })
-    .withMessage('Số sinh viên phải từ 1-200'),
+    .withMessage('Số lượng sinh viên phải từ 1-200'),
   
   body('maxStudents')
     .optional()
-    .isInt({ min: 5, max: 200 })
-    .withMessage('Số sinh viên tối đa phải từ 5-200'),
-  
-  body('schedule.dayOfWeek')
-    .optional()
-    .isInt({ min: 2, max: 7 })
-    .withMessage('Thứ trong tuần phải từ 2-7'),
-  
-  body('schedule.startPeriod')
-    .optional()
-    .isInt({ min: 1, max: 12 })
-    .withMessage('Tiết bắt đầu phải từ 1-12'),
-  
-  body('schedule.periodsCount')
-    .optional()
-    .isInt({ min: 1, max: 6 })
-    .withMessage('Số tiết phải từ 1-6'),
-  
-  body('schedule.room')
-    .optional()
-    .isLength({ max: 50 })
-    .withMessage('Tên phòng học không được quá 50 ký tự'),
-  
-  body('status')
-    .optional()
-    .isIn(['planning', 'open', 'full', 'in_progress', 'completed', 'cancelled'])
-    .withMessage('Trạng thái lớp học không hợp lệ'),
+    .isInt({ min: 1, max: 200 })
+    .withMessage('Số lượng sinh viên tối đa phải từ 1-200'),
   
   body('classType')
-    .optional()
-    .isIn(['theory', 'practice', 'lab', 'seminar', 'online'])
-    .withMessage('Loại lớp học không hợp lệ'),
+    .isIn(['theory', 'practice', 'lab', 'mixed'])
+    .withMessage('Loại lớp không hợp lệ'),
   
   body('teachingMethod')
     .optional()
     .isIn(['offline', 'online', 'hybrid'])
-    .withMessage('Phương thức giảng dạy không hợp lệ'),
-  
-  body('description')
-    .optional()
-    .isLength({ max: 500 })
-    .withMessage('Mô tả không được quá 500 ký tự'),
-  
-  body('notes')
-    .optional()
-    .isLength({ max: 1000 })
-    .withMessage('Ghi chú không được quá 1000 ký tự')
+    .withMessage('Phương thức giảng dạy không hợp lệ')
 ];
 
 const validateClassUpdate = [
   body('code')
     .optional()
-    .isLength({ min: 2, max: 20 })
-    .withMessage('Mã lớp học phần phải từ 2-20 ký tự')
-    .matches(/^[A-Z0-9.-]+$/)
-    .withMessage('Mã lớp học phần chỉ được chứa chữ cái hoa, số, dấu chấm và gạch ngang'),
+    .trim()
+    .isLength({ min: 3, max: 20 })
+    .withMessage('Mã lớp học phải có độ dài từ 3-20 ký tự')
+    .matches(/^[A-Z0-9_-]+$/i)
+    .withMessage('Mã lớp học chỉ được chứa chữ cái, số, gạch dưới và gạch ngang'),
   
   body('name')
     .optional()
-    .isLength({ min: 2, max: 200 })
-    .withMessage('Tên lớp học phần phải từ 2-200 ký tự'),
-  
-  body('semesterId')
-    .optional()
-    .isMongoId()
-    .withMessage('Học kì không hợp lệ'),
+    .trim()
+    .isLength({ min: 5, max: 200 })
+    .withMessage('Tên lớp học phải có độ dài từ 5-200 ký tự'),
   
   body('subjectId')
     .optional()
     .isMongoId()
-    .withMessage('Học phần không hợp lệ'),
+    .withMessage('ID học phần không hợp lệ'),
+  
+  body('academicYearId')
+    .optional()
+    .isMongoId()
+    .withMessage('ID năm học không hợp lệ'),
   
   body('studentCount')
     .optional()
     .isInt({ min: 1, max: 200 })
-    .withMessage('Số sinh viên phải từ 1-200'),
+    .withMessage('Số lượng sinh viên phải từ 1-200'),
   
   body('maxStudents')
     .optional()
-    .isInt({ min: 5, max: 200 })
-    .withMessage('Số sinh viên tối đa phải từ 5-200'),
-  
-  body('schedule.dayOfWeek')
-    .optional()
-    .isInt({ min: 2, max: 7 })
-    .withMessage('Thứ trong tuần phải từ 2-7'),
-  
-  body('schedule.startPeriod')
-    .optional()
-    .isInt({ min: 1, max: 12 })
-    .withMessage('Tiết bắt đầu phải từ 1-12'),
-  
-  body('schedule.periodsCount')
-    .optional()
-    .isInt({ min: 1, max: 6 })
-    .withMessage('Số tiết phải từ 1-6'),
-  
-  body('schedule.room')
-    .optional()
-    .isLength({ max: 50 })
-    .withMessage('Tên phòng học không được quá 50 ký tự'),
-  
-  body('status')
-    .optional()
-    .isIn(['planning', 'open', 'full', 'in_progress', 'completed', 'cancelled'])
-    .withMessage('Trạng thái lớp học không hợp lệ'),
+    .isInt({ min: 1, max: 200 })
+    .withMessage('Số lượng sinh viên tối đa phải từ 1-200'),
   
   body('classType')
     .optional()
-    .isIn(['theory', 'practice', 'lab', 'seminar', 'online'])
-    .withMessage('Loại lớp học không hợp lệ'),
+    .isIn(['theory', 'practice', 'lab', 'mixed'])
+    .withMessage('Loại lớp không hợp lệ'),
   
   body('teachingMethod')
     .optional()
     .isIn(['offline', 'online', 'hybrid'])
-    .withMessage('Phương thức giảng dạy không hợp lệ'),
-  
-  body('description')
-    .optional()
-    .isLength({ max: 500 })
-    .withMessage('Mô tả không được quá 500 ký tự'),
-  
-  body('notes')
-    .optional()
-    .isLength({ max: 1000 })
-    .withMessage('Ghi chú không được quá 1000 ký tự')
+    .withMessage('Phương thức giảng dạy không hợp lệ')
 ];
 
 const validateMongoId = [
-  param('id')
-    .isMongoId()
-    .withMessage('ID không hợp lệ')
+  param('id').isMongoId().withMessage('ID không hợp lệ')
 ];
 
-const validateSemesterId = [
-  param('semesterId')
-    .isMongoId()
-    .withMessage('ID học kì không hợp lệ')
+const validateAcademicYearId = [
+  param('academicYearId').isMongoId().withMessage('Academic Year ID không hợp lệ')
 ];
 
 // Custom validation for schedule conflicts
@@ -208,10 +134,10 @@ const validateSchedule = [
 // @access  Public
 router.get('/statistics', getClassStatistics);
 
-// @route   GET /api/classes/semester/:semesterId
-// @desc    Get classes by semester
+// @route   GET /api/classes/academic-year/:academicYearId
+// @desc    Get classes by academic year
 // @access  Public
-router.get('/semester/:semesterId', validateSemesterId, getClassesBySemester);
+router.get('/academic-year/:academicYearId', validateAcademicYearId, getClassesByAcademicYear);
 
 // @route   GET /api/classes/:id
 // @desc    Get single class
@@ -226,12 +152,12 @@ router.get('/', getClasses);
 // @route   POST /api/classes
 // @desc    Create new class
 // @access  Private
-router.post('/', validateClassCreation, validateSchedule, createClass);
+router.post('/', validateClassCreation, createClass);
 
 // @route   PUT /api/classes/:id
 // @desc    Update class
 // @access  Private
-router.put('/:id', validateMongoId, validateClassUpdate, validateSchedule, updateClass);
+router.put('/:id', validateMongoId, validateClassUpdate, updateClass);
 
 // @route   DELETE /api/classes/:id
 // @desc    Delete class
