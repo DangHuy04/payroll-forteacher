@@ -227,13 +227,13 @@ const getAssignmentsByClass = async (req, res) => {
 // @access  Private
 const createTeachingAssignment = async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
       return res.status(400).json({
         success: false,
         errors: errors.array()
       });
-    }
+  }
 
     const {
       code,
@@ -278,7 +278,7 @@ const createTeachingAssignment = async (req, res) => {
     let finalCode = code;
     if (!finalCode) {
       const assignmentCount = await TeachingAssignment.countDocuments({
-        teacherId,
+      teacherId,
         academicYearId
       });
       finalCode = `${teacher.code}_${classExists.code}_${assignmentCount + 1}`;
@@ -323,13 +323,13 @@ const createTeachingAssignment = async (req, res) => {
 // @access  Private
 const updateTeachingAssignment = async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
       return res.status(400).json({
         success: false,
         errors: errors.array()
       });
-    }
+  }
 
     const assignment = await TeachingAssignment.findById(req.params.id);
     if (!assignment) {

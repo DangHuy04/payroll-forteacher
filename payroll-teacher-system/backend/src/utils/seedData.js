@@ -1314,7 +1314,7 @@ const seedData = async () => {
     const periodRatesData = await createPeriodRates(academicYears);
     const periodRates = await PeriodRate.create(periodRatesData);
     console.log('✅ Đã tạo định mức tiền theo tiết');
-
+      
     // Skip RateSetting and SalaryCalculation for now to avoid validation errors
     console.log('⚠️  Bỏ qua tạo rate settings và salary calculations');
     const rateSettings = [];
